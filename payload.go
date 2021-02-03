@@ -50,11 +50,14 @@ func (e *ServerError) Error() string {
 	return fmt.Sprintf("internal server error: %s", e.Msg)
 }
 
+type Token string
+
 // payload represents either a Client or Server payload
 type payload interface {
 	isPayload()
 }
 
+func (*Token) isPayload()       {}
 func (*Request) isPayload()     {}
 func (*Response) isPayload()    {}
 func (*ServerError) isPayload() {}

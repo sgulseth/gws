@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -81,12 +82,13 @@ func (s *Subscription) Unsubscribe() error {
 }
 
 // NewClient takes a connection and initializes a client over it.
-func NewClient(conn *Conn) Client {
+func NewClient(conn *Conn, token string) Client {
 	c := &client{
 		conn:  conn,
 		subs:  make(map[opID]chan<- qResp),
 		ready: make(chan struct{}, 1),
 		done:  make(chan struct{}, 1),
+		token: token,
 	}
 
 	go c.run()
@@ -100,6 +102,8 @@ type client struct {
 	id     uint64
 	subsMu sync.Mutex
 	subs   map[opID]chan<- qResp
+
+	token string
 
 	err   error
 	ready chan struct{}
@@ -152,7 +156,13 @@ const defaultTimeout = 5 * time.Second
 
 func (c *client) initConn(timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	err := c.conn.write(ctx, operationMessage{Type: gqlConnectionInit})
+
+	var t Token
+	if len(c.token) > 0 {
+		t = Token(fmt.Sprintf("token=%s", c.token))
+	}
+
+	err := c.conn.write(ctx, operationMessage{Type: gqlConnectionInit, Payload: &t})
 	cancel()
 	if err != nil {
 		return ErrIO{
